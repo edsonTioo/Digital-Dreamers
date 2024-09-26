@@ -7,7 +7,7 @@
             </div>
             <!--Para escribir adentro-->
             <div class="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
-            <h1 class="text-4xl font-bold tracking-tight text-white sm:text-6xl text-center">Digital Dreamers</h1>
+            <h1 class="text-4xl font-bold tracking-tight text-white sm:text-6xl text-center">GeoTourNica</h1>
             </div>
             <div class="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
                 aria-hidden="true">

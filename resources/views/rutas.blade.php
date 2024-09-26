@@ -1,246 +1,388 @@
 <?php
 $apiKeyLocationIQ = 'pk.5b64d7be075eb44c66447d92a6b4c2fc';
-$query = 'Empire';
+$query = isset($_GET['query']) ? urlencode($_GET['query']) : '';
+$start = isset($_GET['start']) ? urlencode($_GET['start']) : '';
+$end = isset($_GET['end']) ? urlencode($_GET['end']) : '';
 $countryCode = 'NI';
+$routeDistance = 0;
+$estimatedTime = 0; // Variable para almacenar el tiempo estimado de viaje
 
-$url = "https://api.locationiq.com/v1/autocomplete.php?key=$apiKeyLocationIQ&q=$query&countrycodes=$countryCode";
+// Procesar búsqueda de lugares
+if (isset($_GET['search_places'])) {
+    $url = "https://api.locationiq.com/v1/search.php?key=$apiKeyLocationIQ&q=$query&format=json&countrycodes=$countryCode";
+    $curl = curl_init($url);
+    curl_setopt_array($curl, array(
+        CURLOPT_RETURNTRANSFER    =>  true,
+        CURLOPT_FOLLOWLOCATION    =>  true,
+        CURLOPT_MAXREDIRS         =>  10,
+        CURLOPT_TIMEOUT           =>  30,
+        CURLOPT_CUSTOMREQUEST     =>  'GET',
+    ));
+    $response = curl_exec($curl);
+    $err = curl_error($curl);
+    curl_close($curl);
 
-$curl = curl_init($url);
+    if ($err) {
+        echo 'cURL Error #:' . $err;
+        $data = [];
+    } else {
+        $data = json_decode($response, true);
+    }
 
-curl_setopt_array($curl, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_FOLLOWLOCATION => true,
-    CURLOPT_MAXREDIRS => 10,
-    CURLOPT_TIMEOUT => 30,
-    CURLOPT_CUSTOMREQUEST => 'GET',
-]);
-
-$response = curl_exec($curl);
-$err = curl_error($curl);
-
-curl_close($curl);
-
-if ($err) {
-    echo 'cURL Error #:' . $err;
-    $data = [];
-} else {
-    $data = json_decode($response, true);
+    $uniqueData = [];
+    if (!empty($data)) {
+        foreach ($data as $item) {
+            $uniqueKey = $item['display_name'] . $item['lat'] . $item['lon'];
+            if (!isset($uniqueData[$uniqueKey])) {
+                $uniqueData[$uniqueKey] = $item;
+            }
+        }
+    }
 }
 
-$uniqueData = [];
-if (!empty($data)) {
-    foreach ($data as $item) {
-        $uniqueKey = $item['display_name'] . $item['lat'] . $item['lon'];
-        if (!isset($uniqueData[$uniqueKey])) {
-            $uniqueData[$uniqueKey] = $item;
+// Procesar búsqueda de rutas
+if (isset($_GET['search_route']) || isset($_GET['use_current_location'])) {
+    if (!function_exists('getCoordinatesUnique')) {
+        function getCoordinatesUnique($location, $apiKey) {
+            $url = "https://api.locationiq.com/v1/search.php?key=$apiKey&q=$location&format=json&countrycodes=NI";
+            $curl = curl_init($url);
+            curl_setopt_array($curl, array(
+                CURLOPT_RETURNTRANSFER    =>  true,
+                CURLOPT_FOLLOWLOCATION    =>  true,
+                CURLOPT_MAXREDIRS         =>  10,
+                CURLOPT_TIMEOUT           =>  30,
+                CURLOPT_CUSTOMREQUEST     =>  'GET',
+            ));
+            $response = curl_exec($curl);
+            $err = curl_error($curl);
+            curl_close($curl);
+
+            if ($err) {
+                return null;
+            } else {
+                $data = json_decode($response, true);
+                return !empty($data) ? $data[0] : null;
+            }
+        }
+    }
+
+    if (isset($_GET['use_current_location']) && isset($_GET['start_lat']) && isset($_GET['start_lon'])) {
+        // Usar ubicación actual
+        $startLat = $_GET['start_lat'];
+        $startLon = $_GET['start_lon'];
+    } else {
+        // Usar ciudad de inicio
+        $startCoords = getCoordinatesUnique($start, $apiKeyLocationIQ);
+        if ($startCoords) {
+            $startLat = $startCoords['lat'];
+            $startLon = $startCoords['lon'];
+        }
+    }
+
+    $endCoords = getCoordinatesUnique($end, $apiKeyLocationIQ);
+    $routeData = [];
+
+    if (!empty($startLat) && !empty($startLon) && $endCoords) {
+        $endLat = $endCoords['lat'];
+        $endLon = $endCoords['lon'];
+
+        // Usar la API de direcciones de LocationIQ para obtener la ruta
+        $url = "https://us1.locationiq.com/v1/directions/driving/$startLon,$startLat;$endLon,$endLat?key=$apiKeyLocationIQ&geometries=geojson";
+        $curl = curl_init($url);
+        curl_setopt_array($curl, array(
+            CURLOPT_RETURNTRANSFER    =>  true,
+            CURLOPT_FOLLOWLOCATION    =>  true,
+            CURLOPT_MAXREDIRS         =>  10,
+            CURLOPT_TIMEOUT           =>  30,
+            CURLOPT_CUSTOMREQUEST     =>  'GET',
+        ));
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        curl_close($curl);
+
+        if (!$err) {
+            $routeData = json_decode($response, true);
+            if (!empty($routeData['routes'][0]['distance'])) {
+                $routeDistance = $routeData['routes'][0]['distance'] / 1000; // Convertir a km
+            }
+            if (!empty($routeData['routes'][0]['duration'])) {
+                $estimatedTime = $routeData['routes'][0]['duration']; // Tiempo en segundos
+            }
         }
     }
 }
 ?>
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Inicio | Digital Dreamers</title>
     @vite('resources/css/app.css')
-     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAP NICA</title>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://tiles.locationiq.com/v3/libs/maplibre-gl/1.15.2/maplibre-gl.js"></script>
     <link href="https://tiles.locationiq.com/v3/libs/maplibre-gl/1.15.2/maplibre-gl.css" rel="stylesheet" />
     <script src="https://tiles.locationiq.com/v3/js/liq-styles-ctrl-libre-gl.js?v=0.1.8"></script>
     <link href="https://tiles.locationiq.com/v3/css/liq-styles-ctrl-libre-gl.css?v=0.1.8" rel="stylesheet" />
-    <script src="https://tiles.locationiq.com/v3/libs/gl-geocoder/4.5.1/locationiq-gl-geocoder.min.js?v=0.2.3"></script>
-    <link rel="stylesheet"
-        href="https://tiles.locationiq.com/v3/libs/gl-geocoder/4.5.1/locationiq-gl-geocoder.css?v=0.2.3"
-        type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
     <link rel="stylesheet" href="{{ asset('\node_modules\admin-lte\dist\css\adminlte.css') }}">
-   <style>
-#map {
-    width: 100%;
-    height: 500px; /* Ajusta la altura según lo que necesites */
-    margin-top: 120px; /* Añade margen superior */
+    <style>
+         header {
+            background: linear-gradient(to right, #2c5282, #4c51bf); /* Gradiente de azul a índigo */
+        }
+        footer {
+    margin-top: 50px; /* Aumenta el espacio superior */
+    background-color: #1a202c; /* Ajusta el color de fondo */
+    color: #cbd5e0; /* Color de texto más claro */
+
     
 }
-.elemento {
-  background: linear-gradient(to right, #2c5282, #4c51bf); /* Gradiente de azul a índigo */
-}
-   </style>
 
-
+        #map { height: 500px; width: 100%; }
+        .place-item { display: flex; align-items: center; margin-bottom: 10px; }
+        .place-item img { width: 200px; height: 150px; object-fit: cover; margin-right: 15px; }
+        .place-item .btn-link { font-size: 1.2em; }
+        .form-row .form-group { margin-bottom: 0; }
+        .form-row .form-control { max-width: 300px; }
+        .place-item-container { display: flex; flex-wrap: wrap; gap: 15px; }
+        .suggestions {
+            position: absolute;
+            border: 1px solid #ccc;
+            border-top: none;
+            z-index: 1000;
+            background: white;
+            max-height: 150px;
+            overflow-y: auto;
+            width: calc(100% - 2px);
+        }
+        .suggestion-item {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
 </head>
-
 <body>
-    <div class="bg-gradient-to-r from-blue-800 to-indigo-900">
-        <!--Componente navbar-->
-        <x-component-navbar />
-
-        <div class="relative isolate px-6 pt-14 lg:px-8">
-            <div class="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-                aria-hidden="true">
-                <div class="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
-                    style="clip-path: polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)">
-                </div>
+    <header class="relative inset-x-0 top-0 z-50">
+        <nav class="flex items-center justify-between p-6 lg:px-8" aria-label="Global">
+            <div class="flex lg:flex-1">
+                <a href="#" class="-m-1.5 p-1.5">
+                    <img class="h-20 w-auto" src="{{ asset('img/logonegro.png') }}" alt="Logo">
+                </a>
             </div>
-            <!--Para escribir adentro-->
-            <div class="map-section container">
-                <div id="map" class="w-full h-96 lg:h-[500px] rounded-lg shadow-lg border border-gray-300 bg-gray-100"></div>
+            <div class="hidden lg:flex lg:gap-x-12">
+                <a href="{{route('Welcome')}}" class="text-sm font-semibold leading-6 text-white">Inicio</a>
+                <a href="{{ route('Rutas') }}" class="text-sm font-semibold leading-6 text-white">Rutas</a>
+                <a href="#" class="text-sm font-semibold leading-6 text-white">Leyendas</a>
+                <a href="#" class="text-sm font-semibold leading-6 text-white">Contacto</a>
+                <a href="#" class="text-sm font-semibold leading-6 text-white">Acerca de</a>
             </div>
-
-            <div class="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
-                aria-hidden="true">
-                <div class="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
-                    style="clip-path: polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)">
-                </div>
+            <div class="hidden lg:flex lg:flex-1 lg:justify-end">
+                <a href="#" class="text-sm font-semibold leading-6 text-white">Iniciar Sesión</a>
+            </div>
+        </nav>
+    </header>
+<div class="container mt-5">
+    <h1 class="mb-4">Resultados de Búsqueda</h1>
+    
+    <!-- Formulario para buscar lugares y rutas en una sola línea -->
+    <form method="GET" action="">
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="query">Buscar lugares en Nicaragua:</label>
+                <input type="text" class="form-control" id="query" name="query" placeholder="Ingrese un lugar..." value="<?= htmlspecialchars(urldecode($query)) ?>" autocomplete="off">
+                <button type="submit" class="btn btn-primary mt-2" name="search_places">Buscar lugares</button>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="start">Inicio:</label>
+                <input type="text" class="form-control" id="start" name="start" placeholder="Ciudad de inicio..." value="<?= htmlspecialchars(urldecode($start)) ?>" autocomplete="off">
+                <div id="start-suggestions" class="suggestions"></div>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="end">Destino:</label>
+                <input type="text" class="form-control" id="end" name="end" placeholder="Ciudad de destino..." value="<?= htmlspecialchars(urldecode($end)) ?>" autocomplete="off">
+                <div id="end-suggestions" class="suggestions"></div>
+                <button type="submit" class="btn btn-primary mt-2" name="search_route">Buscar ruta</button>
+                <button type="button" class="btn btn-secondary mt-2" id="useMyLocation">Usar mi ubicación</button>
+                <button type="button" class="btn btn-info mt-2" id="markMyLocation">Marcar mi ubicación</button>
             </div>
         </div>
-    </div>
+        <input type="hidden" name="start_lat" id="start_lat">
+        <input type="hidden" name="start_lon" id="start_lon">
+    </form>
+    
+    <?php if ($routeDistance > 0): ?>
+        <div class="alert alert-info mt-4" role="alert">
+            La distancia aproximada de la ruta es: <?= number_format($routeDistance, 2) ?> km.
+            <?php if ($estimatedTime > 0): ?>
+                <br>Tiempo estimado de viaje: <?= gmdate("H:i:s", $estimatedTime) ?> (horas:minutos:segundos)
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 
-    <section class="bg-black leading-5">
+    <!-- Mapa -->
+    <div id="map" class="mt-4"></div>
+</div>
 
-            <div class="map-container scrollbar">
 
-    </div>
-
-    </section>
-
-    </div>
-
-    <footer>
-        <div class="p-10 bg-gray-800 text-gray-200">
-            <div class="max-w-7xl mx-auto">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div class="mb-5">
-                        <h4 class="pb-4" class="text-2xl pb-4">Company</h4>
-                        <p class="text-gray-500">
-                            A123 los street <br>
-                            Changigarj,PB 15613 <br>
-                            Matagalpa <br><br>
-                            <strong>Phone:</strong>+505 84926150 <br>
-                            <strong>Email:</strong>info@example.com <br>
-                        </p>
-                    </div>
-                    <div class="mb-5">
-                        <h4 class="pb-4">Useful Links</h4>
-                        <ul class="text-gray-500">
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-white"></i>
-                                <a class="hover:text-yellow-500" href="#">Home</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-white"></i>
-                                <a class="hover:text-yellow-500" href="#">About us</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-white"></i>
-                                <a class="hover:text-yellow-500" href="#">Services</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-white"></i>
-                                <a class="hover:text-yellow-500" href="#">Terms of Services</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-white"></i>
-                                <a class="hover:text-yellow-500" href="#">Privacy Policy</a>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="mb-5">
-                        <h4 class="pb-4">Services</h4>
-                        <ul class="text-gray-500">
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-yellow-500"></i>
-                                <a class="hover:text-yellow-500" href="#">Web Design</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-yellow-500"></i>
-                                <a class="hover:text-yellow-500" href="#">Web Development</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-yellow-500"></i>
-                                <a class="hover:text-yellow-500" href="#">Product Management</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-yellow-500"></i>
-                                <a class="hover:text-yellow-500" href="#">Marketing</a>
-                            </li>
-                            <li class="pb-4">
-                                <i class="fa fa-chevron-right text-yellow-500"></i>
-                                <a class="hover:text-yellow-500" href="#">Graphic Design</a>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="mb-5">
-                        <h4 class="pb-4">Join Our Newsletter</h4>
-                        <p class="text-gray-500">Suscribite para ser parte de esta gran familia</p>
-                        <form class="flex felx-row flex-wrap" action="#">
-                            <input class="text-gray-500 w-2/3 p-2 focus:border-yellow-500" type="text" name="email"
-                                id="email" class="p-2 rounded bg-gray-700 text-gray-200" placeholder="Your Email">
-                            <button class="p-2 ml-2 bg-red-600 text-white rounded">Subscribete</button>
-                        </form>
-                    </div>
-                </div>
+<footer>
+    <div class="p-10 bg-gray-800 text-gray-200">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                
             </div>
-            <div class="w-full bg-gray-900 text-gray-500 px-10">
-                <div class="text-center">
-                    <div>
-                        Copyrigh<strong><span>©</span></strong> 2022 Digital Dreamers
-                    </div>
-                    <div>
-                        design by <a href="" class="text-yellow-500">TaiwindCSS</a>
-                    </div>
+        </div>
+        <div class="w-full bg-gray-900 text-gray-500 px-10">
+            <div class="text-center">
+                <div>
+                    Copyrigh<strong><span>©</span></strong> 2024 Digital Dreamers
                 </div>
                 <div>
-                    <a href="#"
-                        class="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-500 mx-1 inline-block pt-1"><i
-                            class="fa fa-facebook"></i></a>
-                    <a href="#"
-                        class="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-500 mx-1 inline-block pt-1"><i
-                            class="fa fa-instagram"></i></a>
-                    <a href="#"
-                        class="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-500 mx-1 inline-block pt-1"><i
-                            class="fa fa-twitter"></i></a>
-                    <a href="#"
-                        class="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-500 mx-1 inline-block pt-1"><i
-                            class="fa fa-linkedin"></i></a>
-
+                    design by <a href="" class="text-yellow-500">TaiwindCSS</a>
                 </div>
             </div>
+            
         </div>
-    </footer>
-
-
-</body>
-
-</html>
-<script src="{{ asset('js/menu.js') }}"></script>
+    </div>
+</footer>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         var map = L.map('map').setView([12.865416, -85.207229], 7); // Coordenadas de Nicaragua
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a >Digital Dreamers</a>'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        var locations = <?php echo json_encode(array_values($uniqueData)); ?>;
+        var locations = <?php echo isset($uniqueData) ? json_encode(array_values($uniqueData)) : '[]'; ?>;
 
-            locations.forEach(function(location) {
-                var marker = L.marker([location.lat, location.lon]).addTo(map)
-                    .bindPopup(`
-                        <div style="font-size: 14px; line-height: 1.5;">
-                            <strong>Nombre:</strong> ${location.display_name}<br>
-                            <strong>Latitud:</strong> ${location.lat}<br>
-                            <strong>Longitud:</strong> ${location.lon}
-                        </div>
-                    `);
+        locations.forEach(function(location) {
+            var marker = L.marker([location.lat, location.lon]).addTo(map)
+                .bindPopup('<strong>Nombre:</strong> ' + location.display_name + '<br>' +
+                           '<strong>Latitud:</strong> ' + location.lat + '<br>' +
+                           '<strong>Longitud:</strong> ' + location.lon);
+        });
+
+        <?php if (!empty($routeData) && isset($routeData['routes'][0]['geometry'])): ?>
+            var route = <?php echo json_encode($routeData['routes'][0]['geometry']); ?>;
+            L.geoJSON(route, {
+                style: function (feature) {
+                    return {color: 'blue'};
+                }
+            }).addTo(map);
+
+            map.fitBounds([
+                [<?= $startLat ?>, <?= $startLon ?>],
+                [<?= $endLat ?>, <?= $endLon ?>]
+            ]);
+        <?php endif; ?>
+
+        // Obtener la ubicación actual del usuario
+        document.getElementById('useMyLocation').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lon = position.coords.longitude;
+
+                    // Establecer valores en el formulario oculto
+                    document.getElementById('start_lat').value = lat;
+                    document.getElementById('start_lon').value = lon;
+
+                    // Enviar el formulario con la ubicación actual
+                    var routeForm = document.querySelector('form');
+                    var useCurrentLocationInput = document.createElement('input');
+                    useCurrentLocationInput.type = 'hidden';
+                    useCurrentLocationInput.name = 'use_current_location';
+                    useCurrentLocationInput.value = '1';
+                    routeForm.appendChild(useCurrentLocationInput);
+                    routeForm.submit();
+                }, function(error) {
+                    console.error('Error al obtener la ubicación: ', error);
+                });
+            } else {
+                alert("La geolocalización no está soportada por este navegador.");
+            }
+        });
+
+        // Marcar la ubicación actual en el mapa
+        document.getElementById('markMyLocation').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lon = position.coords.longitude;
+
+                    if (typeof userLocationMarker !== 'undefined') {
+                        map.removeLayer(userLocationMarker);
+                    }
+
+                    userLocationMarker = L.marker([lat, lon]).addTo(map)
+                        .bindPopup('<strong>Mi ubicación</strong><br>' +
+                                   '<strong>Latitud:</strong> ' + lat + '<br>' +
+                                   '<strong>Longitud:</strong> ' + lon).openPopup();
+
+                    map.setView([lat, lon], 13);
+                }, function(error) {
+                    console.error('Error al obtener la ubicación: ', error);
+                });
+            } else {
+                alert("La geolocalización no está soportada por este navegador.");
+            }
+        });
+
+        function setupAutocomplete(inputId, suggestionsId) {
+            var input = document.getElementById(inputId);
+            var suggestionsContainer = document.getElementById(suggestionsId);
+
+            input.addEventListener('input', function() {
+                var query = input.value;
+
+                if (query.length < 3) {
+                    suggestionsContainer.innerHTML = '';
+                    return;
+                }
+
+                var url = `https://api.locationiq.com/v1/autocomplete.php?key=<?= $apiKeyLocationIQ ?>&q=${encodeURIComponent(query)}&format=json&countrycodes=NI`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        suggestionsContainer.innerHTML = '';
+
+                        data.forEach(item => {
+                            var div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = item.display_name;
+                            div.dataset.lat = item.lat;
+                            div.dataset.lon = item.lon;
+                            div.addEventListener('click', function() {
+                                input.value = item.display_name;
+                                document.getElementById('start_lat').value = item.lat;
+                                document.getElementById('start_lon').value = item.lon;
+                                suggestionsContainer.innerHTML = '';
+                            });
+
+                            suggestionsContainer.appendChild(div);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching suggestions:', error);
+                    });
             });
+
+            document.addEventListener('click', function(event) {
+                if (!suggestionsContainer.contains(event.target) && event.target !== input) {
+                    suggestionsContainer.innerHTML = '';
+                }
+            });
+        }
+
+        setupAutocomplete('start', 'start-suggestions');
+        setupAutocomplete('end', 'end-suggestions');
     });
 </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 <div class="bg-white">
     <div class="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-24 lg:max-w-7xl lg:px-8">
-        <h2 class="text-2xl font-bold tracking-tight text-center text-gray-900">Lugares turisticos de Niacargua</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-center text-gray-900">Lugares turisticos de Nicaragua</h2>
 
         <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
             <!-- Isletas de Granada -->
@@ -18,7 +18,7 @@
                                 <strong>Isletas de Granada</strong>
                             </a>
                         </h3>
-                        <p class="mt-1 text-sm text-gray-500">Los islotes de Granada están ubicados en el lago de
+                        <p class="mt-1 text-sm text-gray-500">Las isletas de Granada están ubicados en el lago de
                             Nicaragua,<br>
                             al sureste de la ciudad de Granada en Nicaragua</p>
                     </div>
@@ -38,7 +38,7 @@
                         <h3 class="text-sm text-gray-700">
                             <a href="#">
                                 <span aria-hidden="true" class="absolute inset-0"></span>
-                                <strong>Volcan Mobacho</strong>
+                                <strong>Volcan Mombacho</strong>
                             </a>
                         </h3>
                         <p class="mt-1 text-sm text-gray-500">El Mombacho es un estratovolcán de Nicaragua, cerca de la
@@ -81,7 +81,7 @@
                         <h3 class="text-sm text-gray-700">
                             <a href="#">
                                 <span aria-hidden="true" class="absolute inset-0"></span>
-                                <strong>Laguna de Aoyoo</strong>
+                                <strong>Laguna de Apoyo</strong>
                             </a>
                         </h3>
                         <p class="mt-1 text-sm text-gray-500">se formó hace unos veintitrés mil años

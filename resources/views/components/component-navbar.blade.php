@@ -1,4 +1,4 @@
-        <header class="absolute inset-x-0 top-0 z-50">
+<header class="absolute inset-x-0 top-0 z-50">
             <nav class="flex items-center justify-between p-6 lg:px-8" aria-label="Global">
                 <div class="flex lg:flex-1">
                     <a href="#" class="-m-1.5 p-1.5">
@@ -17,14 +17,14 @@
                     </button>
                 </div>
                 <div class="hidden lg:flex lg:gap-x-12">
-                    <a href="#" class="text-sm font-semibold leading-6 text-white">Inicio</a>
+                    <a href="{{route('Welcome')}}" class="text-sm font-semibold leading-6 text-white">Inicio</a>
                     <a href="{{ route('Rutas') }}" class="text-sm font-semibold leading-6 text-white">Rutas</a>
-                    <a href="#" class="text-sm font-semibold leading-6 text-white">Leyendas</a>
+                    <a href="{{route('Leyendas')}}" class="text-sm font-semibold leading-6 text-white">Leyendas</a>
                     <a href="#" class="text-sm font-semibold leading-6 text-white">Contacto</a>
                     <a href="#" class="text-sm font-semibold leading-6 text-white">Acerca de</a>
                 </div>
                 <div class="hidden lg:flex lg:flex-1 lg:justify-end">
-                    <a href="#" class="text-sm font-semibold leading-6 text-white">Iniciar Sesión<span></a>
+                 
                 </div>
             </nav>
             <!-- Mobile menu, show/hide based on menu open state. -->
